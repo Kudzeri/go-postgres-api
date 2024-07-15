@@ -56,6 +56,23 @@ func CreateStock(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func insertStock(stock models.Stock) int64 {
+	funcName := "handlers.insertStock():"
+	db := CreateConnection()
+	defer db.Close()
+
+	sqlQuery := `INSERT INTO stocks(name,price,company) VALUES ($1,$2,$3) RETURNING stockid`
+	var id int64
+
+	err := db.QueryRow(sqlQuery, stock.Name, stock.Price, stock.Company).Scan(&id)
+	if err != nil {
+		fmt.Println(funcName + "Unable to execute the query.")
+	}
+
+	fmt.Printf("Inserted a single record %v", id)
+	return id
+}
+
 func GetStock(w http.ResponseWriter, r *http.Request) {
 	funcName := "handlers.GetStock():"
 	params := r.URL.Query()
@@ -74,6 +91,30 @@ func GetStock(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stock)
 }
 
+func getStock(id int64) (models.Stock, error) {
+	funcName := "handlers.getStock():"
+	db := CreateConnection()
+	defer db.Close()
+
+	sqlQuery := `SELECT * FROM stocks WHERE stockid=$1`
+	var stock models.Stock
+
+	row := db.QueryRow(sqlQuery, id)
+	err := row.Scan(&stock.StockID, &stock.Name, &stock.Price, &stock.Company)
+
+	switch err {
+	case sql.ErrNoRows:
+		fmt.Println(funcName + "Now rows were returned!")
+		return stock, nil
+	case nil:
+		return stock, nil
+	default:
+		fmt.Println(funcName + "Unable to scan the row")
+	}
+
+	return stock, err
+}
+
 func GetAllStocks(w http.ResponseWriter, r *http.Request) {
 	funcName := "handlers.GetAllStocks():"
 
@@ -84,6 +125,32 @@ func GetAllStocks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(stocks)
+}
+
+func getAllStocks() ([]models.Stock, error) {
+	funcName := "handlers.getAllStocks():"
+	db := CreateConnection()
+	defer db.Close()
+
+	sqlQuery := `SELECT * FROM stocks`
+	var stocks []models.Stock
+
+	rows, err := db.Query(sqlQuery)
+	if err != nil {
+		fmt.Println(funcName + "Unable to execute the query.")
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var stock models.Stock
+		err := rows.Scan(&stock.StockID, &stock.Name, &stock.Price, &stock.Company)
+		if err != nil {
+			fmt.Println(funcName + "Unable to scan the row.")
+			stocks = append(stocks, stock)
+		}
+	}
+
+	return stocks, err
 }
 
 func UpdateStock(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +180,26 @@ func UpdateStock(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func updateStock(id int64, stock models.Stock) int64 {
+	funcName := "handlers.updateStock():"
+	db := CreateConnection()
+	defer db.Close()
+
+	sqlQuery := `UPDATE stocks SET name = $2, price = $3, company = $4 WHERE stockid = $1`
+	res, err := db.Exec(sqlQuery, id, stock.Name, stock.Price, stock.Company)
+	if err != nil {
+		fmt.Println(funcName + "Unable to execute the query.")
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		fmt.Println(funcName + "Error while checking the affected rows.")
+	}
+
+	fmt.Printf("Total rows/records affected %v", rowsAffected)
+	return rowsAffected
+}
+
 func DeleteStock(w http.ResponseWriter, r *http.Request) {
 	funcName := "handlers.DeleteStock():"
 	params := r.URL.Query()
@@ -122,7 +209,7 @@ func DeleteStock(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(funcName + "Unable to convert the string into int.")
 	}
 
-	deletedRows := DeleteStock(int64(id))
+	deletedRows := deleteStock(int64(id))
 	msg := fmt.Sprintf("Stock deleted successfully.Total rows/records %v", deletedRows)
 	res := Response{
 		ID:      int64(id),
@@ -131,4 +218,24 @@ func DeleteStock(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
+}
+
+func deleteStock(id int64) int64 {
+	funcName := "handlers.deleteStock():"
+	db := CreateConnection()
+	defer db.Close()
+
+	sqlQuery := `DELETE FROM stocks WHERE stockid = $1`
+	res, err := db.Exec(sqlQuery, id)
+	if err != nil {
+		fmt.Println(funcName + "Unable to execute the query.")
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		fmt.Println(funcName + "Error while checking the affected rows.")
+	}
+
+	fmt.Printf("Total rows/records affected %v", rowsAffected)
+	return rowsAffected
 }
