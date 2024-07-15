@@ -22,18 +22,18 @@ func CreateConnection() *sql.DB {
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatal(funcName + "Error loading .env file")
+		log.Fatal(funcName + "Error loading .env file.")
 	}
 	db, err := sql.Open("postgres", os.Getenv("POSTGRES_URL"))
 	if err != nil {
-		log.Fatal(funcName + "Error connecting to database")
+		log.Fatal(funcName + "Error connecting to database.")
 	}
 	err = db.Ping()
 	if err != nil {
-		log.Fatal(funcName + "Error pinging database")
+		log.Fatal(funcName + "Error pinging database.")
 	}
 
-	fmt.Println("Successfully connected to database")
+	fmt.Println("Successfully connected to database.")
 	return db
 }
 
@@ -43,13 +43,13 @@ func CreateStock(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&stock)
 	if err != nil {
-		fmt.Println(funcName + "Unable to decode the request body")
+		fmt.Println(funcName + "Unable to decode the request body.")
 	}
 	insertID := insertStock(stock)
 
 	res := Response{
 		ID:      insertID,
-		Message: "stock created successfully",
+		Message: "Stock created successfully.",
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -62,7 +62,7 @@ func GetStock(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(params.Get("id"))
 	if err != nil {
-		fmt.Println(funcName + "Unable to convert the string into int")
+		fmt.Println(funcName + "Unable to convert the string into int.")
 	}
 
 	stock, err := getStock(int64(id))
@@ -76,12 +76,59 @@ func GetStock(w http.ResponseWriter, r *http.Request) {
 
 func GetAllStocks(w http.ResponseWriter, r *http.Request) {
 	funcName := "handlers.GetAllStocks():"
+
+	stocks, err := getAllStocks()
+	if err != nil {
+		fmt.Println(funcName + "Unable to get stocks.")
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(stocks)
 }
 
 func UpdateStock(w http.ResponseWriter, r *http.Request) {
 	funcName := "handlers.UpdateStock():"
+	params := r.URL.Query()
+
+	id, err := strconv.Atoi(params.Get("id"))
+	if err != nil {
+		fmt.Println(funcName + "Unable to convert the string into int.")
+	}
+
+	var stock models.Stock
+	err = json.NewDecoder(r.Body).Decode(&stock)
+	if err != nil {
+		fmt.Println(funcName + "Unable to decode the request body.")
+	}
+
+	updatedRows := updateStock(int64(id), stock)
+
+	msg := fmt.Sprintf("Stock updated successfully. Total rows/records affected %v.", updatedRows)
+	res := Response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
 }
 
 func DeleteStock(w http.ResponseWriter, r *http.Request) {
 	funcName := "handlers.DeleteStock():"
+	params := r.URL.Query()
+
+	id, err := strconv.Atoi(params.Get("id"))
+	if err != nil {
+		fmt.Println(funcName + "Unable to convert the string into int.")
+	}
+
+	deletedRows := DeleteStock(int64(id))
+	msg := fmt.Sprintf("Stock deleted successfully.Total rows/records %v", deletedRows)
+	res := Response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
 }
